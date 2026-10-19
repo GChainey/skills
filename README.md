@@ -17,3 +17,9 @@ Or download [html-recording.zip](https://garethchainey.com/downloads/html-record
 ## License
 
 MIT
+
+## Maintaining
+
+Edit a skill under `skills/`, push, then rebuild the site's download with
+`scripts/pack.sh html-recording ~/path/to/portfoliowebsite/public/downloads/html-recording.zip`.
+Installed copies update with `npx skills update`.
