@@ -1,0 +1,11 @@
+{
+  "name": "html-recording-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@rrweb/record": "2.1.7",
+    "@rrweb/replay": "2.1.7",
+    "playwright": "^1.56.0"
+  },
+  "license": "MIT"
+}
