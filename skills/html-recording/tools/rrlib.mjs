@@ -76,6 +76,19 @@ const START_RECORDING = `(() => {
   });
 })()`
 
+// rrweb sends mouse positions in batches about every 500 ms, each position carrying a negative
+// timeOffset. The replayer only gets to a batch when its event plays, so hover styles land half a
+// second late: after the cursor has arrived and clicked. One event per position, at the time it
+// happened, puts :hover on the button while the cursor is over it.
+const MOUSE_MOVE = 1, TOUCH_MOVE = 6, DRAG = 12
+function splitMouseMoves(events) {
+  return events.flatMap((e) => {
+    const positions = e.type === 3 && [MOUSE_MOVE, TOUCH_MOVE, DRAG].includes(e.data?.source) && e.data.positions
+    if (!positions || positions.length < 2) return [e]
+    return positions.map((p) => ({ ...e, timestamp: e.timestamp + p.timeOffset, data: { ...e.data, positions: [{ ...p, timeOffset: 0 }] } }))
+  }).sort((a, b) => a.timestamp - b.timestamp)
+}
+
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
 
 // Options:
@@ -201,7 +214,7 @@ export async function record(name, run, { speed = 1, viewport = { width: WIDTH, 
     return o / speed
   }
   // Events inside a cut collapse onto its end, so the next page's full snapshot still lands
-  const retimed = fixValues(events.map((e) => ({ ...e, timestamp: Math.round(shift(e.timestamp)) + 1000000 })))
+  const retimed = fixValues(splitMouseMoves(events).map((e) => ({ ...e, timestamp: Math.round(shift(e.timestamp)) + 1000000 })))
   retimed.sort((a, b) => a.timestamp - b.timestamp)
   const file = path.join(out, `${name}.json`)
   const meta = { name, width: viewport.width, height: viewport.height, mouse: !domCursor, region: r.region ?? null, duration: retimed.at(-1).timestamp - retimed[0].timestamp }
