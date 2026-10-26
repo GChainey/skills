@@ -20,6 +20,17 @@ const OUT = path.resolve(process.env.RR_OUT || 'recordings')
 const ASSET_PATH = process.env.RR_ASSET_PATH || '/replays/assets'
 const WIDTH = 1280
 const HEIGHT = 800
+// The studio's "Next take" knobs, applied to every clip without editing its script:
+//   RR_GLIDE     ms every cursor glide takes (overrides the script's own durations)
+//   RR_PAUSE     multiplies every wait() and click hold
+//   RR_VIEWPORT  "1440x900"
+//   RR_SCHEME    light | dark
+const KNOBS = {
+  glide: process.env.RR_GLIDE ? Number(process.env.RR_GLIDE) : null,
+  pause: process.env.RR_PAUSE ? Number(process.env.RR_PAUSE) : 1,
+  viewport: process.env.RR_VIEWPORT ? (([width, height]) => ({ width, height }))(process.env.RR_VIEWPORT.split('x').map(Number)) : null,
+  scheme: process.env.RR_SCHEME || null,
+}
 const RECORD_JS = fs.readFileSync(path.join(HERE, 'node_modules/@rrweb/record/dist/record.umd.min.cjs'), 'utf8')
 
 // The page-drawn cursor and click ring (domCursor: true). Recorded as elements, so they're
@@ -103,6 +114,9 @@ const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
 //                ['https://www.dispatchmac.com']. Localhost is always saved.
 //   locale, timezoneId   for dates and numbers in the page (the machine's own by default)
 export async function record(name, run, { speed = 1, viewport = { width: WIDTH, height: HEIGHT }, domCursor = false, setup, colorScheme = 'light', out = OUT, assetPath = ASSET_PATH, origins = [], locale, timezoneId } = {}) {
+  if (KNOBS.viewport) viewport = KNOBS.viewport
+  if (KNOBS.scheme) colorScheme = KNOBS.scheme
+  const glideOf = (ms) => KNOBS.glide ?? ms
   fs.mkdirSync(path.dirname(path.join(out, name)), { recursive: true })
   const browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1, colorScheme, locale, timezoneId })
@@ -133,10 +147,11 @@ export async function record(name, run, { speed = 1, viewport = { width: WIDTH, 
       await page.mouse.move(pos.x, pos.y)
       await page.waitForTimeout(200)
     },
-    async wait(ms) { await page.waitForTimeout(ms) },
+    async wait(ms) { await page.waitForTimeout(ms * KNOBS.pause) },
     async css(text) { await page.addStyleTag({ content: text }) },
     // Glide the cursor to a locator's centre or to { x, y }
-    async moveTo(target, { duration = 650 } = {}) {
+    async moveTo(target, { duration: asked = 650 } = {}) {
+      const duration = glideOf(asked)
       let to
       if (typeof target.boundingBox === 'function') {
         await target.scrollIntoViewIfNeeded().catch(() => {})
@@ -158,7 +173,7 @@ export async function record(name, run, { speed = 1, viewport = { width: WIDTH, 
       await r.moveTo(target, opts)
       await page.waitForTimeout(140)
       await page.mouse.down(); await page.waitForTimeout(70); await page.mouse.up()
-      await page.waitForTimeout(opts.after ?? 450)
+      await page.waitForTimeout((opts.after ?? 450) * KNOBS.pause)
     },
     async type(target, text, { delay = 28 } = {}) {
       await r.click(target, { after: 150 })
@@ -217,7 +232,11 @@ export async function record(name, run, { speed = 1, viewport = { width: WIDTH, 
   const retimed = fixValues(splitMouseMoves(events).map((e) => ({ ...e, timestamp: Math.round(shift(e.timestamp)) + 1000000 })))
   retimed.sort((a, b) => a.timestamp - b.timestamp)
   const file = path.join(out, `${name}.json`)
-  const meta = { name, width: viewport.width, height: viewport.height, mouse: !domCursor, region: r.region ?? null, duration: retimed.at(-1).timestamp - retimed[0].timestamp }
+  const meta = {
+    name, width: viewport.width, height: viewport.height, mouse: !domCursor, region: r.region ?? null, duration: retimed.at(-1).timestamp - retimed[0].timestamp,
+    // How to make this take again: the studio's Re-record runs the script with these
+    take: { script: path.resolve(process.argv[1]), clip: name, baseUrl: BASE, out, assetPath, glide: KNOBS.glide, pause: KNOBS.pause, scheme: colorScheme, recordedAt: new Date().toISOString() },
+  }
   // Assets the page loaded, saved next to the recordings and re-pointed at assetPath
   const json = await localise(JSON.stringify({ meta, events: retimed }), out, { assetPath, origins })
   fs.writeFileSync(file, json)

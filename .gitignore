@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 dist/
+
+# The studio ships built, so it runs with no install
+!skills/html-recording/studio/dist/
