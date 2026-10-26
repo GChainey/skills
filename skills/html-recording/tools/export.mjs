@@ -13,6 +13,9 @@
 //     Slack, Notion, email or a quick share; it opens from disk.
 //
 //   --asset-path /replays/assets   what the recordings were localised to (default)
+//
+// A recording edited in the studio has <name>.edit.json beside it; it goes in as `edit`, so the
+// export plays the edited version.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -38,6 +41,16 @@ if (!opt.files.length || (!opt.to && !opt.single)) {
 
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', otf: 'font/otf', css: 'text/css', mp4: 'video/mp4', webm: 'video/webm' }
 
+// The recording, with its studio edit folded in when there is one
+function read(file) {
+  const json = fs.readFileSync(file, 'utf8')
+  const editFile = file.replace(/\.json$/, '.edit.json')
+  if (!fs.existsSync(editFile)) return json
+  const rec = JSON.parse(json)
+  rec.edit = JSON.parse(fs.readFileSync(editFile, 'utf8'))
+  return JSON.stringify(rec)
+}
+
 // The assets a recording points at, found in the assets folder beside it
 function used(json, file) {
   const dir = path.join(path.dirname(path.resolve(file)), 'assets')
@@ -49,9 +62,9 @@ if (opt.to) {
   const to = path.resolve(opt.to)
   fs.mkdirSync(path.join(to, 'assets'), { recursive: true })
   const url = (opt.url || '/' + path.relative(path.resolve(opt.root || '.'), to).split(path.sep).join('/')).replace(/\/$/, '')
-  for (const f of ['html-recording.js', 'rrweb-replay.min.js']) fs.copyFileSync(path.join(HERE, 'player', f), path.join(to, f))
+  for (const f of ['html-recording.js', 'rrweb-replay.min.js', 'edits.js']) fs.copyFileSync(path.join(HERE, 'player', f), path.join(to, f))
   for (const file of opt.files) {
-    let json = fs.readFileSync(file, 'utf8')
+    let json = read(file)
     for (const a of used(json, file)) {
       fs.copyFileSync(a.from, path.join(to, 'assets', a.name))
       json = json.split(`${opt.assetPath}/${a.name}`).join(`${url}/assets/${a.name}`)
@@ -63,7 +76,7 @@ if (opt.to) {
 
 if (opt.single) {
   const blocks = opt.files.map((file, i) => {
-    let json = fs.readFileSync(file, 'utf8')
+    let json = read(file)
     for (const a of used(json, file)) {
       const ext = path.extname(a.name).slice(1)
       json = json.split(`${opt.assetPath}/${a.name}`).join(`data:${MIME[ext] || 'application/octet-stream'};base64,${fs.readFileSync(a.from).toString('base64')}`)
@@ -72,11 +85,13 @@ if (opt.single) {
   })
   const lib = fs.readFileSync(path.join(HERE, 'player/rrweb-replay.min.js'), 'utf8')
   const el = fs.readFileSync(path.join(HERE, 'player/html-recording.js'), 'utf8')
+  const edits = fs.readFileSync(path.join(HERE, 'player/edits.js'), 'utf8')
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${opt.title}</title>
 <style>body { margin: 0; padding: 48px 24px; background: #f4f4f5; } main { max-width: 1100px; margin: 0 auto; display: grid; gap: 48px; }</style>
 <script>${lib.replace(/<\/script/gi, '<\\/script')}</script>
+<script>${edits.replace(/<\/script/gi, '<\\/script')}</script>
 <script>${el.replace(/<\/script/gi, "<\\/script")}</script>
 </head><body><main>
 ${blocks.join('\n')}

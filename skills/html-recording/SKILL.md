@@ -1,6 +1,6 @@
 ---
 name: html-recording
-description: "Record a web page or prototype as an HTML recording instead of a screen video. rrweb captures the real DOM, its CSS and every change; a small player replays it in the page, sharp at any zoom with exact colours, at around 1% of a video's size. Use whenever someone wants a demo, clip, walkthrough, screen recording, replay, 'record this flow', a recording for a case study, docs, a README, Slack or Notion, or to re-record an existing clip after the UI changed. Not for canvas or WebGL content (games, maps, shaders): that still needs video."
+description: "Record a web page or prototype as an HTML recording instead of a screen video. rrweb captures the real DOM, its CSS and every change; a small player replays it in the page, sharp at any zoom with exact colours, at around 1% of a video's size. Use whenever someone wants a demo, clip, walkthrough, screen recording, replay, 'record this flow', a recording for a case study, docs, a README, Slack or Notion, to re-record an existing clip after the UI changed, or to edit a recording (zoom in, cut, speed up, highlight, caption) in Recording Studio. Not for canvas or WebGL content (games, maps, shaders): that still needs video."
 ---
 
 # HTML recordings
@@ -19,6 +19,8 @@ take. Background and side-by-side comparisons: https://garethchainey.com/replay-
 | `tools/snap.mjs` | Screenshots a recording at given seconds, to check it |
 | `tools/export.mjs` | Packages recordings for a website (`--to`) or as one self-contained HTML file (`--single`) |
 | `tools/player/html-recording.js` | `<html-recording>`: the player, a web component with no build step |
+| `tools/player/edits.js` | Cuts, speed, zooms, highlights and captions on top of a recording (the player and the studio share it) |
+| `studio/server.mjs` | Recording Studio: edit takes on a timeline, then export. Runs with no install |
 | `tools/localise.mjs` | Saves the images, fonts and CSS a recording uses and re-points them (runs automatically) |
 | `tools/fix-values.mjs` | Makes typed fields replay their later values (runs automatically) |
 | `examples/clip.mjs` | A clip script to copy |
@@ -109,6 +111,37 @@ node "$SKILL_DIR/tools/snap.mjs" recordings/<name>.json 1,4,8 --out recordings/s
 Look at the screenshots: the page rendered (fonts, images, not a blank frame), the step you meant
 is on screen at each time, and nothing private is showing. Show them to the user.
 
+## 5b. Edit it in the studio
+
+Once a take exists, hand it to the user in Recording Studio instead of iterating on numbers in
+chat: they pick zooms, cuts and captions by hand.
+
+```bash
+node "$SKILL_DIR/studio/server.mjs" recordings [more folders…]   # opens http://localhost:4747
+```
+
+- **Library:** every recording under the folders, newest first.
+- **Timeline:** a frame strip with trim handles; marks for clicks, page changes and scrolls;
+  lanes for zooms, speed changes and captions. Drag blocks to move them, drag their edges to
+  resize; edges snap to the playhead, to events and to each other. `Z` `C` `S` `T` add a zoom,
+  cut, speed change or caption at the playhead; `I` `O` trim; `⌘Z` undoes.
+- **Pick on screen:** the replay is the real page, so clicking an element gives its exact box
+  (a zoom area, a highlight, a crop). Dragging draws a box. Alt picks exactly what is under the
+  cursor instead of the nearest button or row.
+- **Re-record:** runs the clip's script again with the "Next take" settings: cursor speed
+  (`RR_GLIDE`), pauses (`RR_PAUSE`), screen size (`RR_VIEWPORT`) and theme (`RR_SCHEME`). Works for
+  takes recorded with this version of `rrlib.mjs`, which saves the script and base URL in
+  `meta.take`. The same variables work from the command line.
+- **Export:** a single HTML file, or a scene object for the portfolio's reels.
+
+Edits are saved as `<name>.edit.json` beside the recording, which is never changed. Times are ms
+of the raw recording. `export.mjs` folds the edit in (as `edit`), and `<html-recording>` plays it:
+cuts are skipped, speed changes applied, the camera eases to each zoom and the highlight and
+captions show. To play an edit kept beside a recording, pass `edit="<name>.edit.json"`.
+
+To change the studio: `cd studio && npm install && npm run dev` (hot reload on :4748, with the
+server running on :4747), then `npm run build` and commit `studio/dist`.
+
 ## 6. Put it where it's going
 
 **A website or prototype, no build step:**
@@ -128,7 +161,7 @@ copies the player, the recording and only the assets it uses, re-pointed at the 
 Attributes: `src` (a URL, or `#id` of an inline `<script type="application/json">`),
 `region="x,y,width,height"` to crop (defaults to the `focus()` crop; `none` shows the whole
 screen), `bar` (a window bar), `aspect` (CSS aspect-ratio), `controls` (play/pause and a
-scrubber). It loads near the viewport, loops after a beat, pauses off screen, and shows the last
+scrubber), `edit` (an edit file to play through). It loads near the viewport, loops after a beat, pauses off screen, and shows the last
 frame to people who prefer reduced motion.
 
 **React or Next.js:** the same export works (load the script once with `next/script`, then use the
