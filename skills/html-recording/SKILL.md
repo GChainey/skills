@@ -28,12 +28,28 @@ take. Background and side-by-side comparisons: https://garethchainey.com/replay-
 
 ## 1. Set up (once)
 
+**In a project that will keep its clips (the usual case), use the npm package**, so clip scripts
+import it by name and work on any machine or CI:
+
+```bash
+npm i -D html-recording
+npx html-recording setup             # the Chromium it drives
+```
+
+Then `import { record } from 'html-recording'` in clip scripts, and the same commands as below
+through the CLI: `npx html-recording record <clips.mjs> [clip] --base <url> --out <folder>`,
+`npx html-recording studio <folder>`, `npx html-recording export …`, `npx html-recording snap …`.
+Check `package.json` first: if `html-recording` is already a dependency, use it.
+
+**For a one-off with no project** (or to work on the skill itself), use the skill's own copy:
+
 ```bash
 "$SKILL_DIR/tools/setup.sh"
 ```
 
 Installs `@rrweb/record`, `@rrweb/replay` and Playwright into `tools/node_modules`, and the
-Chromium it drives. Needs Node 20 or later.
+Chromium it drives, and clip scripts import `$SKILL_DIR/tools/rrlib.mjs` by its absolute path.
+Needs Node 20 or later.
 
 ## 2. Serve what you're recording
 
