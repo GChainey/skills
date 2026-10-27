@@ -9,6 +9,7 @@
 // Waits sped up with fast() and stretches cut with cut() are retimed in the output.
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { chromium } from 'playwright'
 import { localise } from './localise.mjs'
 import { fixValues } from './fix-values.mjs'
@@ -31,7 +32,8 @@ const KNOBS = {
   viewport: process.env.RR_VIEWPORT ? (([width, height]) => ({ width, height }))(process.env.RR_VIEWPORT.split('x').map(Number)) : null,
   scheme: process.env.RR_SCHEME || null,
 }
-const RECORD_JS = fs.readFileSync(path.join(HERE, 'node_modules/@rrweb/record/dist/record.umd.min.cjs'), 'utf8')
+// rrweb's recorder, wherever npm put it (the skill's own tools/node_modules, or a project's)
+const RECORD_JS = fs.readFileSync(path.join(path.dirname(createRequire(import.meta.url).resolve('@rrweb/record')), 'record.umd.min.cjs'), 'utf8')
 
 // The page-drawn cursor and click ring (domCursor: true). Recorded as elements, so they're
 // under modal dialogs; the default records the mouse natively and the player draws it on top.

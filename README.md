@@ -16,6 +16,19 @@ npx skills add GChainey/skills --skill design-principles-review -g
 
 Or download [html-recording.zip](https://garethchainey.com/downloads/html-recording.zip) and unzip it into `~/.claude/skills`.
 
+### html-recording in a project
+
+The recorder and Recording Studio are also an npm package, so a repo's clip scripts can import it
+by name and run on any machine or in CI:
+
+```bash
+npm i -D html-recording
+npx html-recording setup
+npx html-recording studio recordings
+```
+
+See [skills/html-recording/README.md](skills/html-recording/README.md).
+
 ## License
 
 MIT
@@ -25,3 +38,7 @@ MIT
 Edit a skill under `skills/`, push, then rebuild the site's download with
 `scripts/pack.sh html-recording ~/path/to/portfoliowebsite/public/downloads/html-recording.zip`.
 Installed copies update with `npx skills update`.
+
+To release html-recording to npm: bump `version` in `skills/html-recording/package.json`, then
+`cd skills/html-recording && npm publish`. Rebuild the studio first if it changed
+(`cd studio && npm run build`).
