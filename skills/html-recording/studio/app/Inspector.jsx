@@ -39,7 +39,7 @@ function zoomRegion(region, level, view, screen) {
   }
 }
 
-export function Inspector({ rec, edit, selection, view, length, knobs, setKnobs, canRecord, job, onBegin, onChange, onSelect, onPick, onRemove }) {
+export function Inspector({ rec, edit, selection, view, length, knobs, setKnobs, canRecord, job, clicks, onBegin, onChange, onSelect, onPick, onRemove, onAutoZoom }) {
   const screen = { width: rec.meta.width, height: rec.meta.height }
   const listKey = { zoom: 'zooms', cut: 'cuts', speed: 'speeds', caption: 'captions' }[selection?.kind]
   const item = listKey ? edit[listKey].find((b) => b.id === selection.id) : null
@@ -51,16 +51,24 @@ export function Inspector({ rec, edit, selection, view, length, knobs, setKnobs,
       {item && selection.kind === 'zoom' && (
         <section className="section">
           <div className="section-head"><h2>Zoom {edit.zooms.indexOf(item) + 1}</h2><span className="mono dim">at {time(item.start)}</span></div>
-          <div className="field">
-            <div className="field-row">
-              <span>Area</span>
-              <button className="btn sm accent" onClick={() => onPick('zoom', item.id)}>Pick on screen</button>
-            </div>
-            <span className="mono dim">{regionText(item.region)}</span>
+          <Slider label="Zoom" value={Math.round(E.scaleOf(item, view) * 100)} display={`${Math.round(E.scaleOf(item, view) * 100)}%`} min={110} max={400} step={5} onBegin={onBegin}
+            onChange={(v) => update(E.follows(item) ? { scale: v / 100 } : { scale: v / 100, region: zoomRegion(item.region, v / 100, view, screen) })} />
+          <div className="field-row">
+            <span>Follow the mouse</span>
+            <Toggle label="Follow the mouse" on={E.follows(item)} onClick={() => (E.follows(item)
+              ? commit({ follow: false, region: item.region || zoomRegion({ x: view.x + view.width / 4, y: view.y + view.height / 4, width: view.width / 2, height: view.height / 2 }, E.scaleOf(item, view), view, screen) })
+              : commit({ follow: true }))} />
           </div>
-          <Slider label="Zoom" value={+(view.width / item.region.width).toFixed(2)} display={`${(view.width / item.region.width).toFixed(1)}×`} min={1} max={5} step={0.1} onBegin={onBegin}
-            onChange={(v) => update({ region: zoomRegion(item.region, v, view, screen) })} />
-          <Slider label="Move" value={item.move ?? 900} display={`${((item.move ?? 900) / 1000).toFixed(1)} s`} min={200} max={2000} step={50} onBegin={onBegin}
+          {!E.follows(item) && (
+            <div className="field">
+              <div className="field-row">
+                <span>Area</span>
+                <button className="btn sm accent" onClick={() => onPick('zoom', item.id)}>Pick on screen</button>
+              </div>
+              <span className="mono dim">{regionText(item.region)}</span>
+            </div>
+          )}
+          <Slider label="Ease in and out" value={item.move ?? 900} display={`${((item.move ?? 900) / 1000).toFixed(1)} s`} min={200} max={2000} step={50} onBegin={onBegin}
             onChange={(v) => update({ move: v })} />
           <div className="field">
             <div className="field-row">
@@ -115,13 +123,20 @@ export function Inspector({ rec, edit, selection, view, length, knobs, setKnobs,
             </div>
             <span className="mono dim">{regionText(edit.crop)}</span>
           </div>
+          <div className="field">
+            <div className="field-row">
+              <span>Zooms</span>
+              <button className="btn sm accent" disabled={!clicks} onClick={onAutoZoom}>Zoom on clicks</button>
+            </div>
+            <span className="dim">{edit.zooms.length ? `${edit.zooms.length} zoom${edit.zooms.length > 1 ? 's' : ''}, following the mouse unless set to an area` : clicks ? `Follows the mouse through each run of clicks (${clicks} in this take)` : 'No clicks in this take'}</span>
+          </div>
           <div className="field-row">
             <span>Trim</span>
             <span className="mono dim">{time(edit.trim.start)} – {time(edit.trim.end)}</span>
           </div>
           <div className="keys">
             <kbd>Space</kbd><span>Play or pause</span>
-            <kbd>Z</kbd><span>Zoom at the playhead</span>
+            <kbd>Z</kbd><span>Zoom in, following the mouse</span>
             <kbd>C</kbd><span>Cut a second from the playhead</span>
             <kbd>S</kbd><span>Speed up from the playhead</span>
             <kbd>T</kbd><span>Caption at the playhead</span>

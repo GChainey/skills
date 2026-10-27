@@ -140,7 +140,10 @@ export function App() {
     setPick(null)
     begin()
     if (p.target === 'crop') change((ed) => ({ ...ed, crop: { x: Math.round(region.x), y: Math.round(region.y), width: Math.round(region.width), height: Math.round(region.height) } }))
-    else if (p.target === 'zoom') change((ed) => ({ ...ed, zooms: ed.zooms.map((z) => (z.id === p.id ? { ...z, region: zoomFor(region, view, screen) } : z)) }))
+    else if (p.target === 'zoom') {
+      const area = zoomFor(region, view, screen)
+      change((ed) => ({ ...ed, zooms: ed.zooms.map((z) => (z.id === p.id ? { ...z, follow: false, region: area, scale: +(view.width / area.width).toFixed(2) } : z)) }))
+    }
     else change((ed) => ({ ...ed, zooms: ed.zooms.map((z) => (z.id === p.id ? { ...z, highlight: { x: Math.round(region.x), y: Math.round(region.y), width: Math.round(region.width), height: Math.round(region.height), label } } : z)) }))
   }
 
@@ -151,11 +154,10 @@ export function App() {
     const item = { id: uid(), start: at }
     begin()
     if (kind === 'zoom') {
-      const centre = { x: view.x + view.width / 4, y: view.y + view.height / 4, width: view.width / 2, height: view.height / 2 }
-      Object.assign(item, { end: Math.min(duration, at + 2500), region: E.toAspect(centre, view.width / view.height, screen), move: 900, highlight: null })
+      // Screen Studio style: zoom in and follow the mouse; set an area instead in the inspector
+      Object.assign(item, { end: Math.min(duration, at + 3000), scale: 1.8, follow: true, move: 900, highlight: null })
       change((ed) => ({ ...ed, zooms: [...ed.zooms, item].sort((a, b) => a.start - b.start) }))
       setSelection({ kind, id: item.id })
-      startPick('zoom', item.id)
       return
     }
     if (kind === 'cut') Object.assign(item, { end: Math.min(duration, at + 1000) })
@@ -166,6 +168,26 @@ export function App() {
     setSelection({ kind, id: item.id })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rec, raw, duration, view, screen, begin, change])
+
+  // Zoom on clicks: one follow zoom over each run of clicks (clicks less than 2.5 s apart), from
+  // just before the first to a beat after the last, where there isn't a zoom already
+  const clicks = useMemo(() => marks.filter((m) => m.kind === 'click').map((m) => m.t), [marks])
+  const autoZoom = () => {
+    const runs = []
+    for (const t of clicks) {
+      const last = runs.at(-1)
+      if (last && t - last.end < 2500) last.end = t
+      else runs.push({ start: t, end: t })
+    }
+    const lo = edit.trim.start, hi = edit.trim.end
+    const fresh = runs
+      .map((r) => ({ id: uid(), start: Math.round(Math.max(lo, r.start - 900)), end: Math.round(Math.min(hi, r.end + 1800)), scale: 1.8, follow: true, move: 900, highlight: null }))
+      .filter((z) => z.end - z.start > 1200 && !edit.zooms.some((o) => o.start < z.end && z.start < o.end))
+    if (!fresh.length) { setToast({ text: 'Every run of clicks already has a zoom' }); return }
+    begin()
+    change((ed) => ({ ...ed, zooms: [...ed.zooms, ...fresh].sort((a, b) => a.start - b.start) }))
+    setToast({ text: `Added ${fresh.length} zoom${fresh.length > 1 ? 's' : ''} that follow the mouse` })
+  }
 
   const remove = () => {
     const key = { zoom: 'zooms', cut: 'cuts', speed: 'speeds', caption: 'captions' }[selection?.kind]
@@ -230,6 +252,22 @@ export function App() {
       setToast({ text: `Saved ${path.split('/').pop()}`, action: ['Show in Finder', () => api.reveal(path)] })
     } catch (e) { setToast({ text: `Export failed: ${e.message}` }) }
   }
+  // The portfolio's reels move their camera between keyframes, so a follow zoom becomes a
+  // keyframe a second along its path (and one back to the whole view after it)
+  const cameraKeys = () => {
+    const cam = new E.Camera({ view, edit, track: E.cursorTrack(rec.events) })
+    const at = (t) => +(E.toEdited(segs, t) / 1000).toFixed(2)
+    const keys = []
+    for (const z of edit.zooms) {
+      const mark = z.highlight ? { mark: { x: z.highlight.x, y: z.highlight.y, width: z.highlight.width, height: z.highlight.height } } : {}
+      for (let t = z.start + (z.move ?? 900); t < z.end - (z.move ?? 900); t += E.follows(z) ? 1000 : Infinity) {
+        const r = cam.at(t).region
+        keys.push({ at: at(t), region: { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }, ...mark })
+      }
+      keys.push({ at: at(z.end), region: view })
+    }
+    return keys
+  }
   const copyForSite = async () => {
     setMenu(false)
     const at = (t) => +(E.toEdited(segs, t) / 1000).toFixed(2)
@@ -239,7 +277,7 @@ export function App() {
       from: +(edit.trim.start / 1000).toFixed(2),
       to: +(edit.trim.end / 1000).toFixed(2),
       title: current.name,
-      ...(edit.zooms.length ? { camera: edit.zooms.map((z) => ({ at: at(z.start), region: z.region, ...(z.highlight ? { mark: { x: z.highlight.x, y: z.highlight.y, width: z.highlight.width, height: z.highlight.height } } : {}) })) } : {}),
+      ...(edit.zooms.length ? { camera: cameraKeys() } : {}),
       ...(edit.captions.length ? { notes: edit.captions.map((c) => ({ at: at(c.start), text: c.text })) } : {}),
     }
     await navigator.clipboard.writeText(JSON.stringify(scene, null, 2))
@@ -315,6 +353,7 @@ export function App() {
           <Inspector
             rec={rec} edit={edit} selection={selection} view={view} length={length}
             knobs={knobs} setKnobs={setKnobs} canRecord={!!current?.canRecord} job={job?.id && job.status !== 'done' ? job : null}
+            clicks={clicks.length} onAutoZoom={autoZoom}
             onBegin={begin} onChange={change} onSelect={setSelection} onPick={startPick} onRemove={remove}
           />
         ) : <aside className="inspector" />}
@@ -322,7 +361,7 @@ export function App() {
 
       {ready && (
         <Timeline
-          id={id} rec={rec} edit={edit} marks={marks} raw={raw} selection={selection} viewWidth={view.width}
+          id={id} rec={rec} edit={edit} marks={marks} raw={raw} selection={selection} view={view}
           onSeek={(t) => stage.current?.seekRaw(t)} onSelect={setSelection} onBegin={begin} onChange={change} onAdd={add}
         />
       )}

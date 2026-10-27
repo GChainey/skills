@@ -1,6 +1,6 @@
 import { memo, useLayoutEffect, useRef, useState } from 'react'
 import { Thumb } from './Thumb.jsx'
-import { clamp } from './util.js'
+import { E, clamp } from './util.js'
 
 const LABEL = 104
 const PAD = 16
@@ -24,7 +24,7 @@ const Strip = memo(function Strip({ id, rec, width }) {
   )
 })
 
-export function Timeline({ id, rec, edit, marks, raw, selection, viewWidth, onSeek, onSelect, onBegin, onChange, onAdd }) {
+export function Timeline({ id, rec, edit, marks, raw, selection, view, onSeek, onSelect, onBegin, onChange, onAdd }) {
   const duration = rec.meta.duration
   const trackRef = useRef(null)
   const [W, setW] = useState(0)
@@ -139,7 +139,7 @@ export function Timeline({ id, rec, edit, marks, raw, selection, viewWidth, onSe
       <div className="lane">
         <span className="lane-label">Zoom<button className="add" title="Zoom at the playhead (Z)" onClick={() => onAdd('zoom')}><Plus /></button></span>
         <div className="track" onPointerDown={seekFrom}>
-          {edit.zooms.map((b) => block('zoom', 'zooms', b, `${(viewWidth / b.region.width).toFixed(1)}×`))}
+          {edit.zooms.map((b) => block('zoom', 'zooms', b, `${Math.round(E.scaleOf(b, view) * 100)}%${E.follows(b) ? '' : ' · area'}`))}
         </div>
       </div>
 
