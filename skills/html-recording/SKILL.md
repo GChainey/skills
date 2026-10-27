@@ -125,8 +125,13 @@ node "$SKILL_DIR/studio/server.mjs" recordings [more folders…]   # opens http:
   lanes for zooms, speed changes and captions. Drag blocks to move them, drag their edges to
   resize; edges snap to the playhead, to events and to each other. `Z` `C` `S` `T` add a zoom,
   cut, speed change or caption at the playhead; `I` `O` trim; `⌘Z` undoes.
+- **Zooms work like Screen Studio's:** outside a zoom the whole screen is in frame; inside one
+  the camera eases in to the zoom level (180% by default) and follows the mouse, with a dead zone
+  in the middle of the frame and a damped spring so it glides rather than jitters. **Zoom on
+  clicks** adds one over each run of clicks. Turn "Follow the mouse" off to hold a fixed area
+  instead (picked on screen).
 - **Pick on screen:** the replay is the real page, so clicking an element gives its exact box
-  (a zoom area, a highlight, a crop). Dragging draws a box. Alt picks exactly what is under the
+  (a fixed zoom area, a highlight, a crop). Dragging draws a box. Alt picks exactly what is under the
   cursor instead of the nearest button or row.
 - **Re-record:** runs the clip's script again with the "Next take" settings: cursor speed
   (`RR_GLIDE`), pauses (`RR_PAUSE`), screen size (`RR_VIEWPORT`) and theme (`RR_SCHEME`). Works for
@@ -136,8 +141,8 @@ node "$SKILL_DIR/studio/server.mjs" recordings [more folders…]   # opens http:
 
 Edits are saved as `<name>.edit.json` beside the recording, which is never changed. Times are ms
 of the raw recording. `export.mjs` folds the edit in (as `edit`), and `<html-recording>` plays it:
-cuts are skipped, speed changes applied, the camera eases to each zoom and the highlight and
-captions show. To play an edit kept beside a recording, pass `edit="<name>.edit.json"`.
+cuts are skipped, speed changes applied, the camera follows the mouse through each zoom (from
+the recorded mouse track, so scrubbing matches playback) and the highlight and captions show. To play an edit kept beside a recording, pass `edit="<name>.edit.json"`.
 
 To change the studio: `cd studio && npm install && npm run dev` (hot reload on :4748, with the
 server running on :4747), then `npm run build` and commit `studio/dist`.

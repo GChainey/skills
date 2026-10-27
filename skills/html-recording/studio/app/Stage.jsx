@@ -30,7 +30,7 @@ export const Stage = forwardRef(function Stage({ rec, edit, mode, selection, pic
   const [playing, setPlaying] = useState(false)
   const [hover, setHover] = useState(null)
   const [drag, setDrag] = useState(null)
-  const lastMove = useRef(900)
+  const track = useMemo(() => E.cursorTrack(events), [events])
 
   const playEdit = useMemo(() => (mode === 'raw' ? E.empty(meta.duration) : edit), [mode, edit, meta.duration])
   const editingCrop = pick?.target === 'crop' || selection?.kind === 'crop'
@@ -85,28 +85,30 @@ export const Stage = forwardRef(function Stage({ rec, edit, mode, selection, pic
   const fw = Math.floor(view.width * k)
   const fh = Math.floor(view.height * k)
 
-  // While playing the edit, the camera follows the zooms; paused, it shows the whole view so
-  // the zoom areas can be seen and moved
+  // The camera: playing the edit, it is the real thing (following the mouse in follow zooms);
+  // paused, the whole view shows with the camera's frame drawn on it, so zooms can be judged
+  // while scrubbing
+  const camera = useMemo(() => new E.Camera({ view, edit, track }), [view, edit, track])
+  const shot = mode === 'edited' && !editingCrop ? camera.at(raw) : { region: view, amount: 0, zoom: null }
   const camLive = playing && mode === 'edited'
-  const zoomNow = mode === 'edited' ? E.zoomAt(edit, raw) : null
-  const region = camLive && zoomNow ? zoomNow.region : view
-  if (camLive && zoomNow) lastMove.current = zoomNow.move ?? 900
+  const region = camLive ? shot.region : view
   const f = fw ? E.fit(region, fw, fh) : { scale: 1, x: 0, y: 0 }
   const cameraStyle = {
     width: meta.width,
     height: meta.height,
     transform: `scale(${f.scale}) translate(${f.x}px, ${f.y}px)`,
-    transition: camLive ? `transform ${zoomNow?.move ?? lastMove.current}ms ${E.EASE}` : 'none',
     '--b': `${2 / f.scale}px`,
     '--inv': 1 / f.scale,
   }
 
   const selectedZoom = selection?.kind === 'zoom' ? edit.zooms.find((z) => z.id === selection.id) : null
-  const shownZooms = !camLive && mode === 'edited' && !editingCrop
-    ? edit.zooms.filter((z) => z === selectedZoom || (z.start <= raw && raw < z.end))
-    : []
+  const zoomNow = shot.zoom
+  // Paused: the camera's frame at the playhead, or a fixed zoom's area when it's selected
+  const frameBox = !camLive && mode === 'edited' && !editingCrop
+    ? (shot.amount > 0.01 ? { region: shot.region, zoom: zoomNow } : selectedZoom && !E.follows(selectedZoom) ? { region: selectedZoom.region, zoom: selectedZoom } : null)
+    : null
   const caption = mode === 'edited' ? E.captionAt(edit, raw) : null
-  const liveMark = camLive && zoomNow?.highlight
+  const markOpacity = camLive && zoomNow?.highlight ? Math.max(0, shot.amount * 2 - 1) : 0
 
   // Picking: pointer → recorded px
   const toRec = (e) => {
@@ -153,17 +155,16 @@ export const Stage = forwardRef(function Stage({ rec, edit, mode, selection, pic
       <div className="frame" style={{ width: fw, height: fh }}>
         <div className="camera" style={cameraStyle}>
           <div ref={mountRef} />
-          {shownZooms.map((z) => (
-            <div key={z.id} className={`ov zoom${z === selectedZoom ? ' sel' : ''}`} style={box4(z.region)}>
-              {z === selectedZoom && (
-                <span className="tag">Zoom {edit.zooms.indexOf(z) + 1}<span className="mono">{(view.width / z.region.width).toFixed(1)}×</span></span>
-              )}
+          {frameBox && (
+            <div className={`ov zoom${frameBox.zoom === selectedZoom ? ' sel' : ''}`} style={box4(frameBox.region)}>
+              <span className="tag">
+                Zoom {edit.zooms.indexOf(frameBox.zoom) + 1}
+                <span className="mono">{Math.round(E.scaleOf(frameBox.zoom, view) * 100)}%{E.follows(frameBox.zoom) ? ' · follows' : ''}</span>
+              </span>
             </div>
-          ))}
-          {!camLive && selectedZoom?.highlight && <div className="ov hl edit" style={box4(selectedZoom.highlight)} />}
-          {mode === 'edited' && zoomNow?.highlight && (
-            <div className="ov hl" style={{ ...box4(zoomNow.highlight), opacity: liveMark ? 1 : 0, transitionDelay: liveMark ? `${zoomNow.move ?? 900}ms` : '0ms' }} />
           )}
+          {!camLive && selectedZoom?.highlight && <div className="ov hl edit" style={box4(selectedZoom.highlight)} />}
+          {camLive && zoomNow?.highlight && <div className="ov hl" style={{ ...box4(zoomNow.highlight), opacity: markOpacity }} />}
           {editingCrop && edit.crop && <div className="ov crop" style={box4(edit.crop)} />}
           {pick && hover && !drag && <div className="ov hover" style={box4(hover.region)} />}
           {pick && drag && (

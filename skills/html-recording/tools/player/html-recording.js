@@ -38,7 +38,7 @@
     html-recording .hr-bar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.15); }
     html-recording .hr-box { position: relative; width: 100%; overflow: hidden; }
     html-recording .hr-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; opacity: 0; }
-    html-recording .hr-mark { position: absolute; z-index: 5; border-radius: 3px; background: rgba(255, 214, 0, .38); mix-blend-mode: multiply; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+    html-recording .hr-mark { position: absolute; z-index: 5; border-radius: 3px; background: rgba(255, 214, 0, .38); mix-blend-mode: multiply; opacity: 0; pointer-events: none; }
     html-recording .hr-caption { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 80%; padding: 8px 14px; border-radius: 8px; background: rgba(17,17,17,.82); color: #fff; font: 500 clamp(12px, 1.6vw, 17px)/1.35 system-ui, sans-serif; text-align: center; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
     html-recording .replayer-wrapper { position: relative; }
     html-recording .replayer-wrapper > iframe { border: none; display: block; pointer-events: none; }
@@ -95,29 +95,20 @@
     }
     fit() {
       if (!this.view) return
-      if (this.driver) return this.frame(this.driver.raw(), true)
+      if (this.driver) return this.frame(this.driver.raw())
       const k = this.box.clientWidth / this.view.width
       this.stage.style.transform = `scale(${k}) translate(${-this.view.x}px, ${-this.view.y}px)`
       this.stage.style.opacity = '1'
     }
-    // With an edit: point the camera at the zoom (or the whole view), mark the highlight, show the caption
-    frame(raw, instant) {
+    // With an edit: the camera (following the mouse in follow zooms), the highlight and the caption
+    frame(raw) {
       const E = window.HtmlRecordingEdits
-      const zoom = E.zoomAt(this.edit, raw)
-      const region = zoom?.region || this.view
-      const key = zoom ? zoom.id : 'view'
-      const move = instant || key === this.shot ? 'none' : `transform ${zoom?.move ?? this.leaving ?? 900}ms ${E.EASE}`
-      if (key !== this.shot || instant) {
-        this.stage.style.transition = move
-        this.stage.style.transform = E.transformFor(region, this.box.clientWidth, this.box.clientHeight)
-        this.leaving = zoom?.move
-        this.shot = key
-      }
+      const shot = this.camera.at(raw)
+      this.stage.style.transform = E.transformFor(shot.region, this.box.clientWidth, this.box.clientHeight)
       this.stage.style.opacity = '1'
-      const h = zoom?.highlight
+      const h = shot.zoom?.highlight
       if (h) Object.assign(this.mark.style, { left: h.x + 'px', top: h.y + 'px', width: h.width + 'px', height: h.height + 'px' })
-      this.mark.style.transitionDelay = h && !instant ? `${zoom.move ?? 900}ms` : '0ms'
-      this.mark.style.opacity = h ? '1' : '0'
+      this.mark.style.opacity = h ? String(Math.max(0, shot.amount * 2 - 1)) : '0'
       const c = E.captionAt(this.edit, raw)
       if (c) this.caption.textContent = c.text
       this.caption.style.opacity = c ? '1' : '0'
@@ -143,7 +134,9 @@
       // Loop, after a beat on the last frame
       const loop = () => setTimeout(() => { if (this.visible && this.player === r && !this.paused) this.play(0) }, 1200)
       if (this.edit) {
-        this.driver = new window.HtmlRecordingEdits.Driver(r, { duration: meta.duration, edit: this.edit, onFrame: (raw, instant) => this.frame(raw, instant), onFinish: loop })
+        const E = window.HtmlRecordingEdits
+        this.camera = new E.Camera({ view: this.view, edit: this.edit, track: E.cursorTrack(rec.events) })
+        this.driver = new E.Driver(r, { duration: meta.duration, edit: this.edit, onFrame: (raw) => this.frame(raw), onFinish: loop })
         this.duration = this.driver.length
       } else r.on('finish', loop)
       this.fit()
