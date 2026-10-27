@@ -1,10 +1,10 @@
 {
   "name": "html-recording",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Record web pages as HTML (the real DOM, via rrweb) instead of video, edit them in Recording Studio, and play them anywhere.",
   "keywords": ["rrweb", "screen recording", "replay", "demo", "walkthrough", "playwright", "screen studio"],
   "type": "module",
-  "bin": { "html-recording": "./cli.mjs" },
+  "bin": { "html-recording": "cli.mjs" },
   "exports": {
     ".": "./tools/rrlib.mjs",
     "./edits": "./tools/player/edits.js",
