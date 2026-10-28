@@ -5,12 +5,14 @@ Agent skills by [Gareth Chainey](https://garethchainey.com). They work with Clau
 | Skill | What it does |
 | --- | --- |
 | [html-recording](skills/html-recording) | Record a web page or prototype as HTML instead of video: the real DOM, replayed in the page, sharp at any zoom and around 1% of the size. [Why](https://garethchainey.com/replay-vs-video) |
+| [sizzle-reel](skills/sizzle-reel) | A feature video the way Cursor makes them: a short card, then a demo of exactly that, repeated. Built on html-recording; tuned in Recording Studio's Reels view; exported as MP4 or HTML. |
 | [design-principles-review](skills/design-principles-review) | Critique a UI against the 13 graphic design principles, with a measured style audit, a pass/warn/fail table, a fix-first list, and an annotated critique board plus fixes frame in Paper. |
 
 ## Install
 
 ```bash
 npx skills add GChainey/skills --skill html-recording -g
+npx skills add GChainey/skills --skill sizzle-reel -g
 npx skills add GChainey/skills --skill design-principles-review -g
 ```
 

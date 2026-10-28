@@ -5,6 +5,7 @@ import { Stage } from './Stage.jsx'
 import { Timeline } from './Timeline.jsx'
 import { Inspector, zoomFor } from './Inspector.jsx'
 import { Thumb } from './Thumb.jsx'
+import { ReelEditor } from './ReelEditor.jsx'
 
 const PROMPTS = {
   zoom: 'Click what to zoom on, or drag a box',
@@ -47,7 +48,9 @@ function Library({ recordings, folders, current, onOpen }) {
 }
 
 export function App() {
-  const [list, setList] = useState({ folders: [], recordings: [] })
+  const [list, setList] = useState({ folders: [], recordings: [], reels: [] })
+  const [studioView, setStudioView] = useState(() => localStorage.getItem('studio.view') || 'takes')
+  useEffect(() => { localStorage.setItem('studio.view', studioView) }, [studioView])
   const [id, setId] = useState(() => decodeURIComponent(location.hash.slice(1)) || null)
   const [rec, setRec] = useState(null)
   const [edit, setEdit] = useState(null)
@@ -60,6 +63,7 @@ export function App() {
   const [job, setJob] = useState(null)
   const [menu, setMenu] = useState(false)
   const [toast, setToast] = useState(null)
+  const showToast = useCallback((text, action) => setToast({ text, action }), [])
   const [error, setError] = useState(null)
   const [playing, setPlaying] = useState(false)
   const stage = useRef(null)
@@ -297,10 +301,36 @@ export function App() {
 
   const ready = rec && edit && loaded.current === id
 
+  const modeSwitch = (
+    <div className="seg sm mode" role="group" aria-label="Show">
+      <button className={studioView === 'takes' ? 'on' : ''} onClick={() => setStudioView('takes')}>Takes</button>
+      <button className={studioView === 'reels' ? 'on' : ''} onClick={() => { stage.current?.pause(); setStudioView('reels') }}>Reels</button>
+    </div>
+  )
+
+  if (studioView === 'reels') {
+    return (
+      <>
+        <ReelEditor
+          list={list} modeSwitch={modeSwitch} refresh={refresh}
+          onEditTake={(take) => { setStudioView('takes'); location.hash = take }}
+          onToast={showToast}
+        />
+        {toast && (
+          <div className="toast" role="status">
+            {toast.text}
+            {toast.action && <button className="btn sm" onClick={() => { toast.action[1](); setToast(null) }}>{toast.action[0]}</button>}
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className="studio">
       <header className="topbar">
         <div className="crumbs">
+          {modeSwitch}
           {current && <span className="dim">{current.folder}</span>}
           {current && <span className="faint">/</span>}
           <b>{current?.name || 'Recording Studio'}</b>

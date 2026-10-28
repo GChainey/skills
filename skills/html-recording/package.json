@@ -1,8 +1,8 @@
 {
   "name": "html-recording",
-  "version": "0.1.1",
-  "description": "Record web pages as HTML (the real DOM, via rrweb) instead of video, edit them in Recording Studio, and play them anywhere.",
-  "keywords": ["rrweb", "screen recording", "replay", "demo", "walkthrough", "playwright", "screen studio"],
+  "version": "0.2.0",
+  "description": "Record web pages as HTML (the real DOM, via rrweb) instead of video, edit them in Recording Studio, cut them into sizzle reels, and play them anywhere.",
+  "keywords": ["rrweb", "screen recording", "replay", "demo", "walkthrough", "playwright", "screen studio", "sizzle reel"],
   "type": "module",
   "bin": { "html-recording": "cli.mjs" },
   "exports": {
@@ -11,6 +11,7 @@
     "./player/html-recording.js": "./tools/player/html-recording.js",
     "./player/edits.js": "./tools/player/edits.js",
     "./player/rrweb-replay.min.js": "./tools/player/rrweb-replay.min.js",
+    "./player/reel.js": "./tools/player/reel.js",
     "./package.json": "./package.json"
   },
   "files": [
