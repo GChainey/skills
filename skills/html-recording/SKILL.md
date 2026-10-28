@@ -20,7 +20,9 @@ take. Background and side-by-side comparisons: https://garethchainey.com/replay-
 | `tools/export.mjs` | Packages recordings for a website (`--to`) or as one self-contained HTML file (`--single`) |
 | `tools/player/html-recording.js` | `<html-recording>`: the player, a web component with no build step |
 | `tools/player/edits.js` | Cuts, speed, zooms, highlights and captions on top of a recording (the player and the studio share it) |
-| `studio/server.mjs` | Recording Studio: edit takes on a timeline, then export. Runs with no install |
+| `studio/server.mjs` | Recording Studio: edit takes on a timeline, lay out reels, then export. Runs with no install |
+| `tools/player/reel.js` | `<html-reel>`: sizzle reels (cards and demos). See the sizzle-reel skill |
+| `tools/reel.mjs` | Renders a reel to MP4 (frame by frame, needs ffmpeg) or one HTML file |
 | `tools/localise.mjs` | Saves the images, fonts and CSS a recording uses and re-points them (runs automatically) |
 | `tools/fix-values.mjs` | Makes typed fields replay their later values (runs automatically) |
 | `examples/clip.mjs` | A clip script to copy |
@@ -154,6 +156,8 @@ node "$SKILL_DIR/studio/server.mjs" recordings [more folders…]   # opens http:
   takes recorded with this version of `rrlib.mjs`, which saves the script and base URL in
   `meta.take`. The same variables work from the command line.
 - **Export:** a single HTML file, or a scene object for the portfolio's reels.
+- **Reels:** the Takes / Reels switch lays takes out as a sizzle reel (text in, demonstration next)
+  and exports it as MP4 or HTML. How to plan and write one is in the **sizzle-reel** skill.
 
 Edits are saved as `<name>.edit.json` beside the recording, which is never changed. Times are ms
 of the raw recording. `export.mjs` folds the edit in (as `edit`), and `<html-recording>` plays it:

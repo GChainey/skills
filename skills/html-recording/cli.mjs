@@ -6,6 +6,7 @@
 //   npx html-recording studio [folder…]              open Recording Studio (--port 4747 --no-open)
 //   npx html-recording export <rec.json…> …          --to <folder> | --single <file.html>
 //   npx html-recording snap <rec.json> <secs>        screenshots to check a take (--out <folder>)
+//   npx html-recording reel <x.reel.json> …          a sizzle reel: --mp4 <out.mp4> | --single <out.html>
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
@@ -41,6 +42,7 @@ switch (cmd) {
   case 'studio': run(path.join(HERE, 'studio/server.mjs'), args); break
   case 'export': run(path.join(HERE, 'tools/export.mjs'), args); break
   case 'snap': run(path.join(HERE, 'tools/snap.mjs'), args); break
+  case 'reel': run(path.join(HERE, 'tools/reel.mjs'), args); break
   default:
     console.log(`html-recording: record web pages as HTML, edit them, play them anywhere
 
@@ -49,6 +51,7 @@ switch (cmd) {
   npx html-recording studio [folder…]            open Recording Studio  --port 4747  --no-open
   npx html-recording export <rec.json…>          --to <folder> [--url /path]  |  --single <file.html>
   npx html-recording snap <rec.json> <1,4,8>     screenshots to check a take  --out <folder>
+  npx html-recording reel <x.reel.json>          a sizzle reel  --mp4 <out.mp4>  |  --single <out.html>
 
 In a clip script:  import { record } from 'html-recording'
 Guide: https://github.com/GChainey/skills/tree/main/skills/html-recording`)

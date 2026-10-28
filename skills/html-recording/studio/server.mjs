@@ -52,8 +52,10 @@ function readMeta(file) {
 }
 
 const assetDirs = new Set()
+let reelsFound = []
 function scan() {
   const found = []
+  const reels = []
   const walk = (dir, depth) => {
     let entries
     try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
@@ -62,6 +64,9 @@ function scan() {
       if (e.isDirectory()) {
         if (e.name === 'assets') assetDirs.add(full)
         if (!SKIP.has(e.name) && !e.name.startsWith('.') && depth < 5) walk(full, depth + 1)
+      } else if (e.name.endsWith('.reel.json')) {
+        const root = opt.dirs.find((d) => full.startsWith(d))
+        reels.push({ id: idOf(full), name: e.name.replace(/\.reel\.json$/, ''), folder: path.relative(root, path.dirname(full)) || path.basename(root), file: full, modified: fs.statSync(full).mtimeMs })
       } else if (e.name.endsWith('.json') && !e.name.endsWith('.edit.json') && !e.name.startsWith('package')) {
         const meta = readMeta(full)
         if (!meta) continue
@@ -82,6 +87,7 @@ function scan() {
     }
   }
   for (const d of opt.dirs) walk(d, 0)
+  reelsFound = reels.sort((a, b) => b.modified - a.modified)
   return found.sort((a, b) => b.modified - a.modified)
 }
 
@@ -119,6 +125,48 @@ function rerecord(file, knobs) {
   return job
 }
 
+// Reels: render to MP4 or a single HTML file in the background, reporting progress
+function renderReel(file, kind) {
+  const id = String(++jobCount)
+  const out = file.replace(/\.reel\.json$/, kind === 'mp4' ? '.mp4' : '.html')
+  const job = { id, file, out, kind, status: 'running', progress: 0, log: '', startedAt: Date.now() }
+  jobs.set(id, job)
+  const child = spawn(process.execPath, [path.join(TOOLS, 'reel.mjs'), file, kind === 'mp4' ? '--mp4' : '--single', out], { cwd: path.dirname(file) })
+  const add = (d) => {
+    const text = d.toString()
+    for (const m of text.matchAll(/progress ([\d.]+)/g)) job.progress = Number(m[1])
+    job.log += text
+    if (job.log.length > 20000) job.log = job.log.slice(-20000)
+  }
+  child.stdout.on('data', add)
+  child.stderr.on('data', add)
+  child.on('close', (code) => { job.status = code === 0 ? 'done' : 'failed'; job.progress = code === 0 ? 1 : job.progress })
+  return job
+}
+
+// A first reel from the takes in a folder: opener, then a card and a demo per take, then the outro
+function newReel(folder) {
+  const dir = opt.dirs.map((d) => path.join(d, folder)).find((d) => fs.existsSync(d)) || opt.dirs[0]
+  let name = 'reel', n = 1
+  while (fs.existsSync(path.join(dir, `${name}.reel.json`))) name = `reel-${++n}`
+  const takes = scan().filter((r) => path.dirname(r.file) === dir).slice(0, 5).reverse()
+  const id = () => Math.random().toString(36).slice(2, 9)
+  const reel = {
+    version: 1, shape: '16:9', background: 'dusk', cards: 'light', brand: { mark: null },
+    scenes: [
+      { id: id(), type: 'opener', title: 'New in your product', sub: 'What this reel shows', duration: 3000 },
+      ...takes.flatMap((t) => [
+        { id: id(), type: 'card', text: t.name.replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase()), duration: 2000 },
+        { id: id(), type: 'demo', take: path.basename(t.file), from: 0, to: t.duration },
+      ]),
+      { id: id(), type: 'outro', text: '', duration: 2500 },
+    ],
+  }
+  const file = path.join(dir, `${name}.reel.json`)
+  fs.writeFileSync(file, JSON.stringify(reel, null, 2) + '\n')
+  return file
+}
+
 function exportSingle(file) {
   return new Promise((resolve, reject) => {
     const out = file.replace(/\.json$/, '.html')
@@ -148,7 +196,25 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
   const p = decodeURIComponent(url.pathname)
   try {
-    if (p === '/api/recordings') return send(res, 200, { folders: opt.dirs, recordings: scan() })
+    if (p === '/api/recordings') { const recordings = scan(); return send(res, 200, { folders: opt.dirs, recordings, reels: reelsFound }) }
+    if (p === '/api/reel') {
+      const file = fileOf(url.searchParams.get('id'))
+      if (req.method === 'PUT') {
+        fs.writeFileSync(file, JSON.stringify(await body(req), null, 2) + '\n')
+        return send(res, 200, { saved: true })
+      }
+      return send(res, 200, { reel: JSON.parse(fs.readFileSync(file, 'utf8')), dir: path.dirname(file) })
+    }
+    if (p === '/api/reel/new' && req.method === 'POST') {
+      const { folder = '' } = await body(req)
+      const file = newReel(folder)
+      return send(res, 200, { id: idOf(file) })
+    }
+    if (p === '/api/reel/render' && req.method === 'POST') {
+      const { id, kind } = await body(req)
+      const job = renderReel(fileOf(id), kind === 'mp4' ? 'mp4' : 'html')
+      return send(res, 200, { job: job.id })
+    }
     if (p === '/api/recording') return sendFile(res, fileOf(url.searchParams.get('id')))
     if (p === '/api/edit') {
       const file = editFileOf(fileOf(url.searchParams.get('id')))

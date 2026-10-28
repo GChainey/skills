@@ -14,6 +14,10 @@ export const api = {
   job: (job) => fetch(`/api/jobs/${job}`).then(json),
   exportSingle: (id) => send('POST', '/api/export', { id }),
   reveal: (path) => send('POST', '/api/reveal', { path }),
+  reel: (id) => fetch(`/api/reel?id=${id}`).then(json),
+  saveReel: (id, reel) => send('PUT', `/api/reel?id=${id}`, reel),
+  newReel: (folder) => send('POST', '/api/reel/new', { folder }),
+  renderReel: (id, kind) => send('POST', '/api/reel/render', { id, kind }),
 }
 
 // Recordings are big; fetch each once

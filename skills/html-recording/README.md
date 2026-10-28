@@ -46,6 +46,13 @@ npx html-recording studio recordings     # http://localhost:4747
 
 Edits save as `<name>.edit.json` beside the recording, which is never changed.
 
+## Sizzle reels
+
+The studio's **Reels** view cuts takes into a reel the way Cursor shows a feature: a card that says
+what you can do, then a demo of it, repeated, with an opener and the logo. Export it as an MP4 for
+X, LinkedIn or YouTube (`npx html-recording reel name.reel.json --mp4 name.mp4`, needs ffmpeg) or one
+HTML file (`--single name.html`). Guide: the [sizzle-reel skill](https://github.com/GChainey/skills/tree/main/skills/sizzle-reel).
+
 ## Play
 
 ```bash
